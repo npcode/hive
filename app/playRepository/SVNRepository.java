@@ -10,6 +10,7 @@ import models.User;
 import models.enumeration.ResourceType;
 import models.resource.Resource;
 
+import org.apache.tika.Tika;
 import org.codehaus.jackson.node.ObjectNode;
 
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -96,20 +97,7 @@ public class SVNRepository implements PlayRepository {
 
         } else if(nodeKind == SVNNodeKind.FILE) {
             //파일 내용 출력
-            ObjectNode result = Json.newObject();
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            SVNProperties prop = new SVNProperties();
-            repository.getFile(path, -1l, prop, baos);
-
-            result.put("type", "file");
-            result.put("revisionNo", prop.getStringValue(SVNProperty.COMMITTED_REVISION));
-            String author = prop.getStringValue(SVNProperty.LAST_AUTHOR);
-            result.put("author", author);
-            setAvatar(result, author);
-            result.put("createdDate", prop.getStringValue(SVNProperty.COMMITTED_DATE));
-            result.put("data", baos.toString());
-            return result;
+            return fileAsJson(path, repository);
         } else {
             return null;
         }
@@ -161,24 +149,43 @@ public class SVNRepository implements PlayRepository {
             return result;
 
         } else if(nodeKind == SVNNodeKind.FILE) {
-            //파일 내용 출력
-            ObjectNode result = Json.newObject();
-
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            SVNProperties prop = new SVNProperties();
-            repository.getFile(path, -1l, prop, baos);
-
-            result.put("type", "file");
-            result.put("revisionNo", prop.getStringValue(SVNProperty.COMMITTED_REVISION));
-            String author = prop.getStringValue(SVNProperty.LAST_AUTHOR);
-            result.put("author", author);
-            setAvatar(result, author);
-            result.put("createdDate", prop.getStringValue(SVNProperty.COMMITTED_DATE));
-            result.put("data", baos.toString());
-            return result;
+            return fileAsJson(path, repository);
         } else {
             return null;
         }
+    }
+
+    private ObjectNode fileAsJson(String path, org.tmatesoft.svn.core.io.SVNRepository repository) throws SVNException {
+        //파일 내용 출력
+        ObjectNode result = Json.newObject();
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        SVNProperties prop = new SVNProperties();
+        repository.getFile(path, -1l, prop, baos);
+
+        result.put("type", "file");
+        result.put("revisionNo", prop.getStringValue(SVNProperty.COMMITTED_REVISION));
+        String author = prop.getStringValue(SVNProperty.LAST_AUTHOR);
+        result.put("author", author);
+        setAvatar(result, author);
+        result.put("createdDate", prop.getStringValue(SVNProperty.COMMITTED_DATE));
+        long size = repository.info(path, -1l).getSize();
+        result.put("size", size);
+
+        if (size > MAX_FILE_SIZE_CAN_BE_VIEWED) {
+            result.put("isBinary", true);
+            result.put("mimeType", "application/octet-stream");
+        } else {
+            byte[] bytes = baos.toByteArray();
+            boolean isBinary = FileUtil.isBinary(bytes);
+            result.put("isBinary", isBinary);
+            if (!isBinary) {
+                result.put("data", new String(bytes));
+            }
+            result.put("mimeType", new Tika().detect(bytes, path));
+        }
+
+        return result;
     }
 
     @Override

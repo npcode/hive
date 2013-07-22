@@ -7,6 +7,8 @@ import models.User;
 import models.enumeration.ResourceType;
 import models.enumeration.State;
 import models.resource.Resource;
+import org.apache.tika.Tika;
+import org.apache.tika.metadata.Metadata;
 import org.codehaus.jackson.node.ObjectNode;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.LogCommand;
@@ -16,7 +18,6 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.errors.AmbiguousObjectException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
@@ -32,9 +33,7 @@ import play.Logger;
 import play.libs.Json;
 import utils.FileUtil;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -42,6 +41,7 @@ import java.util.*;
  */
 public class GitRepository implements PlayRepository {
 
+    private static final long ALLOWED_MAX_FILESIZE = 1024 * 1024;
     /**
      * Git 저장소 베이스 디렉토리
      */
@@ -241,7 +241,8 @@ public class GitRepository implements PlayRepository {
 
     /**
      * {@code treeWalk}가 현재 위치한 파일 메타데이터를 JSON 데이터로 변환하여 반환한다.
-     * 그 파일에 대한 {@code untilCommitId} 혹은 그 이전 커밋 중에서 가장 최근 커밋 정보를 사용하여 Commit 메시지와 author 정보등을 같이 반홚다.
+     * 그 파일에 대한 {@code untilCommitId} 혹은 그 이전 커밋 중에서 가장 최근 커밋 정보를 사용하여 Commit
+     * 메시지와 author 정보등을 같이 반환한다.
      *
      * @param treeWalk
      * @param untilCommitId
@@ -269,8 +270,19 @@ public class GitRepository implements PlayRepository {
         result.put("commitMessage", commit.getShortMessage());
         result.put("commiter", commit.getAuthorIdent().getName());
         result.put("commitDate", commitTime);
-        String str = new String(repository.open(treeWalk.getObjectId(0)).getBytes(), "UTF-8");
-        result.put("data", str);
+        ObjectLoader file = repository.open(treeWalk.getObjectId(0));
+        result.put("size", file.getSize());
+
+        boolean isBinary = FileUtil.isBinary(file.openStream());
+        result.put("isBinary", isBinary);
+        if (!isBinary || file.getSize() > MAX_FILE_SIZE_CAN_BE_VIEWED) {
+            String str = new String(file.getBytes(), "UTF-8");
+            result.put("data", str);
+        }
+        Metadata meta = new Metadata();
+        meta.add(Metadata.RESOURCE_NAME_KEY, treeWalk.getNameString());
+        result.put("mimeType", new Tika().detect(file.openStream(), meta));
+
         return result;
     }
 

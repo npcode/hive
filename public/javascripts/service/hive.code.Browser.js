@@ -244,19 +244,43 @@
          * @param {Hash Table} htData
          */
         function handleFile(sPath, htData){
+            var rxSub, aMime, sType;
+
             // 커밋 정보 업데이트
             htElement.welCommiter.text(htData.author || '');
             htElement.welCommitMsg.text(htData.msg || '');
             htElement.welCommitRev.text((htData.revisionNo && htData.revisionNo != '') ? "Revision#: " + htData.revisionNo : '');
             htElement.welCommitDate.text(moment(new Date(htData.createdDate)).fromNow());
-            
-            // 파일 종류에 따라 구분
-            if(_isImageFile(sPath)){
-                _showImage(sPath);
-            } else if(_getEditorModeByPath(sPath)){
-                _showCode(htData.data, _getEditorModeByPath(sPath));
-            } else {
+
+            if (htData.size > 0 && !htData.data) {
+                // The server didn't send the contents of the file. Consider the
+                // file is binary.
                 _showFile(sPath, htData);
+            } else if (htData.isBinary) {
+                aMime = htData.mimeType.split('/');
+                sType = aMime[0];
+
+                if (sType == 'image') {
+                    // The server told this data is an image.
+                    _showImage(sPath);
+                } else {
+                    // The server told this is binary but not an image.
+                    _showFile(sPath, htData);
+                }
+            } else {
+                rxSub = /text\/x-(.+)-source/;
+                aMatch = htData.mimeType.match(rxSub);
+
+                if (aMatch) {
+                    // The server told which language is used to write the
+                    // source code.
+                    _showCode(htData.data, aMatch[1]);
+                } else {
+                    // The server told this is not binary but did't tell which
+                    // language is used, so the client should guess it.
+                    sEditorMode = _getEditorModeByPath(sPath);
+                    _showCode(htData.data, sEditorMode);
+                }
             }
 
             htElement.welFileList.hide();
@@ -298,7 +322,9 @@
             htElement.welBtnRawCode.show();
             htElement.welBtnFullScreen.show();
 
-            htVar.oSession.setMode("ace/mode/" + sMode);
+            if (sMode) {
+                htVar.oSession.setMode("ace/mode/" + sMode);
+            }
             htVar.oEditor.setValue(sCode, -1);
             
             setTimeout(_resizeEditor, 50);
@@ -318,7 +344,7 @@
             htElement.welBtnRawCode.hide();
             htElement.welBtnFullScreen.hide();
 
-            htElement.welShowFileSize.html(humanize.filesize(htData.data.length));
+            htElement.welShowFileSize.html(humanize.filesize(htData.size));
             htElement.welShowFileName.html(basename(sPath));
             htElement.welShowFileHref.attr("href", "rawcode" + sPath);
         }
