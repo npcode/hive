@@ -44,8 +44,8 @@ public class AccessControl {
      * Checks if an user has a permission to create a resource of the given
      * type in the given project.
      *
-     * 주의: 어떤 리소스의 저자이기 때문에 그 리소스에 속한 리소스를 생성할 수 있는지에 대한
-     * 여부는 검사하지 않는다.
+     * Note: This method does not check if the user has a permission to create
+     * a resource as an author of a resource which contains the resource.
      *
      * @param user
      * @param project
