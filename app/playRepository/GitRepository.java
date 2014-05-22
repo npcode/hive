@@ -73,9 +73,6 @@ import java.util.*;
 
 import static org.eclipse.jgit.diff.DiffEntry.ChangeType.*;
 
-/**
- * Git 저장소
- */
 public class GitRepository implements PlayRepository {
     private static final ModelLock<Project> PROJECT_LOCK = new ModelLock<>();
 
@@ -85,12 +82,12 @@ public class GitRepository implements PlayRepository {
     public static final int COMMIT_HISTORY_LIMIT = 1000 * 1000;
 
     /**
-     * Git 저장소 베이스 디렉토리
+     * The base directory for Git repository
      */
     private static String repoPrefix = "repo/git/";
 
     /**
-     * Git 저장소 베이스 디렉토리
+     * The base directory for Git merging-repository
      */
     private static String repoForMergingPrefix = "repo/git-merging/";
 
@@ -385,12 +382,16 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code treeWalk}가 현재 위치한 디렉토리에 들어있는 파일과 디렉토리 메타데이터를 JSON 데이터로 변환하여 반환한다.
-     * 각 파일과 디렉토리에 대한 {@code untilCommitId} 혹은 그 이전 커밋 중에서 가장 최근 커밋 정보를 사용하여 Commit 메시지와 author 정보등을 같이 반홚다.
+     * Return a metadata which represents the directory in which
+     * {@code treeWalk} is.
+     *
+     * The metadata is a set of entries represent all files and subdirectories
+     * which are included in the directory. Each entry has also an information
+     * about the latest commit modifying the entry.
      *
      * @param treeWalk
      * @param untilCommitId
-     * @return
+     * @return metadata in json which represents the directory
      * @throws IOException
      * @throws GitAPIException
      * @see <a href="https://www.kernel.org/pub/software/scm/git/docs/git-log.html">git log until</a>
@@ -524,7 +525,7 @@ public class GitRepository implements PlayRepository {
                 }
             };
 
-            // Choose only "interest" objects from the blobs and trees. We are interested in
+            // Choose only objects which interest from the blobs and trees. We are interested in
             // blobs and trees which has change between the last commit and the current commit.
             traverseTree(commit, objectCollector);
             for(RevCommit parent : commit.getParents()) {
@@ -584,7 +585,7 @@ public class GitRepository implements PlayRepository {
         }
 
         /*
-         * Now, every objects in `objects` are interested. Get metadata from the objects, put
+         * Now, all `objects` interest. Get metadata from the objects, put
          * them into `found` and remove from `targets`.
          */
         private void found(RevCommit revCommit, Map<String, ObjectId> objects) {
@@ -612,11 +613,13 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@link Constants#HEAD}에서 {@code path}에 해당하는 파일을 반환한다.
+     * Returns the contents of the file matched up with the given revision and
+     * path.
      *
      * @param revision
      * @param path
-     * @return {@code path}가 디렉토리일 경우에는 null, 아닐때는 해당 파일
+     * @return null if the {@code path} denotes a directory, or the contents if
+     *         not
      * @throws IOException
      */
     @Override
@@ -631,9 +634,11 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * Git 저장소 디렉토리를 삭제한다.
-     * 변경전 {@code repository.close()}를 통해 open된 repository의 리소스를 반환하고
-     * repository 내부에서 사용하는 {@code Cache}를 초기화하여 packFile의 참조를 제거한다.
+     * Deletes the directory of this Git repository.
+     *
+     * By {@code repository.close()}, return open resources of repository and
+     * remove the references to packFile by initializing {@code Cache} used in
+     * the repository.
      */
     @Override
     public void delete() {
@@ -644,13 +649,14 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code rev}에 해당하는 리비전의 변경 내역을 반환한다.
+     * Returns the patch made by the commit denoted by the given revision.
      *
-     * {@code rev}에 해당하는 커밋의 root tree와 그 이전 커밋의 root tree를 비교한다.
-     * 이전 커밋이 없을 때는 비어있는 트리와 비교한다.
+     * The patch comes from the difference between the root tree of the commit
+     * denoted by the given revision and the root tree of the parent commit. If
+     * there is no parent commit, compare with an empty tree.
      *
      * @param rev
-     * @return
+     * @return the string form of the patch in unified diff format
      * @throws GitAPIException
      * @throws IOException
      */
@@ -708,13 +714,14 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code rev}에 해당하는 리비전의 변경 내역을 반환한다.
+     * Returns the difference made by the commit denoted by the given revision.
      *
-     * {@code rev}에 해당하는 커밋의 root tree와 그 이전 커밋의 root tree를 비교한다.
-     * 이전 커밋이 없을 때는 비어있는 트리와 비교한다.
+     * The patch comes from the difference between the root tree of the commit
+     * denoted by the given revision and the root tree of the parent commit. If
+     * there is no parent commit, compare with an empty tree.
      *
-     * @param rev
-     * @return
+     * @param rev the revision
+     * @return the list of differences of files
      * @throws GitAPIException
      * @throws IOException
      */
@@ -767,13 +774,12 @@ public class GitRepository implements PlayRepository {
 
 
     /**
-     * {@code untilRevName}에 해당하는 리비전까지의 커밋 목록을 반환한다.
-     * {@code untilRevName}이 null이면 HEAD 까지의 커밋 목록을 반환한다.
+     * Returns commits until the given revision.
      *
-     * @param pageNumber 0부터 시작
+     * @param pageNumber a 0-based page number
      * @param pageSize
-     * @param untilRevName
-     * @return
+     * @param untilRevName a revision; If null, it returns commits until HEAD.
+     * @return list of the commits
      * @throws IOException
      * @throws GitAPIException
      */
@@ -821,8 +827,9 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * Git 저장소의 모든 브랜치 이름을 반환한다.
-     * @return
+     * Returns names of all branches.
+     *
+     * @return list of the name strings
      */
     @Override
     public List<String> getBranches() {
@@ -885,9 +892,10 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * Git 디렉토리 경로를 반환한다.
+     * Returns the directory path to the Git repository.
      *
-     * when: Git 저장소를 참조하는 {@link Repository} 객체를 생성할 때 주로 사용한다.
+     * This method is used when create {@link Repository} object which refers
+     * a Git repository.
      *
      * @param project
      * @return
@@ -898,9 +906,10 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * Git 디렉토리 URL을 반환한다.
+     * Returns the url to the Git repository.
      *
-     * when: 로컬 저장소에서 clone, fetch, push 커맨드를 사용할 때 저장소를 참조할 URL이 필요할 때 사용한다.
+     * This method is used when a URL to Git repository is required for clone,
+     * fetch and push command.
      *
      * @param project
      * @return
@@ -912,9 +921,10 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * Git 디렉토리 경로를 반환한다.
+     * Returns the directory path to the Git repository.
      *
-     * when: Git 저장소를 참조하는 {@link Repository} 객체를 생성할 때 주로 사용한다.
+     * This method is used when create {@link Repository} object which refers
+     * a Git repository.
      *
      * @param ownerName
      * @param projectName
@@ -925,12 +935,13 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code gitUrl}의 Git 저장소를 clone 하는 {@code forkingProject}의 Git 저장소를 생성한다.
+     * Clone a Git repository.
      *
-     * 모든 브랜치를 복사하며 bare 모드로 생성한다.
+     * Create a bare repository and copy all branches from the origin repository
+     * into it.
      *
-     * @param gitUrl
-     * @param forkingProject
+     * @param gitUrl the url to the origin repository
+     * @param forkingProject the project to have the cloned repository
      * @throws GitAPIException
      * @throws IOException
      * * @see <a href="https://www.kernel.org/pub/software/scm/git/docs/gitglossary.html#def_bare_repository">bare repository</a>
@@ -952,13 +963,12 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code repository}에 있는 {@code src} 브랜치에 있는 코드를
-     * {@code remote}의 {@code dest} 브랜치로 push 한다.
+     * Push branches.
      *
-     * @param repository
-     * @param remote
-     * @param src
-     * @param dest
+     * @param repository the source repository
+     * @param remote the destination repository
+     * @param src src of refspec
+     * @param dest dst of refspec
      * @throws GitAPIException
      */
     public static void push(Repository repository, String remote, String src, String dest) throws GitAPIException {
@@ -969,12 +979,13 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code repository}에서 {@code branchName}에 해당하는 브랜치를 merge 한다.
+     * Merge a branch.
      *
-     * Fast forward 일 경우에도 머지 커밋을 기록하도록 --no-ff 옵션을 추가한다.
+     * Create a merge commit even when the merge resolves as a fast-forward, by
+     * adding --no-ff option.
      *
      * @param repository
-     * @param branchName
+     * @param branchName the name of the branch to be merged.
      * @return
      * @throws GitAPIException
      * @throws IOException
@@ -988,10 +999,10 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code repository}에서 {@code branchName}에 해당하는 브랜치로 checkout 한다.
+     * Checkout the branch.
      *
      * @param repository
-     * @param branchName
+     * @param branchName the name of the branch to checkout
      * @throws GitAPIException
      */
     public static void checkout(Repository repository, String branchName) throws GitAPIException {
@@ -1002,7 +1013,9 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * 코드를 merge할 때 사용할 working tree 경로를 반환한다.
+     * Returns the path to working tree.
+     *
+     * This method is used for merge.
      *
      * @param owner
      * @param projectName
@@ -1045,8 +1058,10 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code revA} 와 {@code revB} 를 비교하여 변경되는 코드의 원작자들을 얻는다.
-     * 원작자는 변경된 line 을 마지막으로 수정한 사람의 email 을 이용해서 yobi 사용자를 찾은 결과이다.
+     * Find authors of changes between the given revisions.
+     *
+     * Find the authors by the email addresses of the person who modified the
+     * changed line most recently.
      *
      * @param repository
      * @param revA
@@ -1085,12 +1100,12 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code commitA} 와 {@code commitB} 를 비교하여 차이점을 {@link DiffEntry} 의 목록으로 반환한다.
+     * Returns the difference between the given commits.
      *
      * @param repository
      * @param commitA
      * @param commitB
-     * @return
+     * @return list of {@link org.eclipse.jgit.diff.DiffEntry}
      * @throws IOException
      */
     private static List<DiffEntry> getDiffEntries(Repository repository, RevCommit commitA,
@@ -1106,7 +1121,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code type} 이 {@code types} 에 포함되는지 확인한다.
+     * Check if {@code types} contain the given {@code type}
      *
      * @param type
      * @param types
@@ -1117,11 +1132,11 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * 파일 변경 내용에서 원작자를 git-blame 을 이용하여 추출한다.
+     * Find authors of modified or removed lines from the given edit list.
      *
      * @param repository
-     * @param diff 파일 변경 내용
-     * @param start blame 시작 commit
+     * @param diff the edit list
+     * @param start the oldest commit to be considered
      * @return
      * @throws GitAPIException
      * @throws IOException
@@ -1143,11 +1158,12 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * 편집 정보와 blame 결과를 이용해서 수정되거나 삭제된 줄의 원작자를 추출한다.
+     * Find authors of modified or removed lines from the given edit list and
+     * the result of blame.
      *
-     * @param edits 편집 정보
-     * @param blameResult blame 결과
-     * @return
+     * @param edits an edit list
+     * @param blameResult the result of blame
+     * @return set of the authors
      */
     private static Set<User> getAuthorsFromBlameResult(EditList edits, BlameResult blameResult) {
         Set<User> authors = new HashSet<>();
@@ -1162,11 +1178,11 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * 기준 commit 포함 이전 commit 들 중, 지정된 경로에 해당하는 파일을 생성한 commit 의 원작자를 찾는다.
+     * Find the author of the file denoted by the given path.
      *
      * @param repository
-     * @param path 경로
-     * @param start 기준 commit
+     * @param path
+     * @param start Consider only the commits since {@code start}.
      * @return
      * @throws IOException
      */
@@ -1195,7 +1211,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@link PersonIdent} 를 이용해서 {@link User} 를 찾는다.
+     * Find the user who matchs up with the {@code personIdent}.
      *
      * @param personIdent
      * @return
@@ -1208,7 +1224,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@code repository}에 있는 {@code branchName}에 해당하는 브랜치를 삭제한다.
+     * Delete the branch denoted by the given name.
      *
      * @param repository
      * @param branchName
@@ -1222,13 +1238,12 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * {@link Project}의 Git 저장소의 {@code fromBranch}에 있는 내용을
-     * 현재 사용중인 Git 저장소의 {@code toBranch}로 fetch 한다.
+     * Fetch branches.
      *
-     * @param repository fetch 실행할 Git 저장소
-     * @param project fetch 대상 프로젝트
-     * @param fromBranch fetch source 브랜치
-     * @param toBranch fetch destination 브랜치
+     * @param repository Stores the fetched objects and refs in this repository.
+     * @param project Fetches from this project.
+     * @param fromBranch src of refspec
+     * @param toBranch dst of refspec
      * @throws GitAPIException
      * @throws IOException
      * @see <a href="https://www.kernel.org/pub/software/scm/git/docs/git-fetch.html">git-fetch</a>
@@ -1844,8 +1859,9 @@ public class GitRepository implements PlayRepository {
     }
 
     /**
-     * 로컬에 있는 저장소를 복제한다. 디스크 공간을 절약하기 위해, Git object들은 복사하지 않고 대신 하드링크를
-     * 건다.
+     * Clone a local repository.
+     *
+     * Do not copy but hardlink Git objects to save disk space.
      *
      * @param originalProject
      * @param forkProject
@@ -2034,7 +2050,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /*
-     * 주어진 git 객체 참조 값에 해당하는 것을 가져온다
+     * Find a Git object by revision.
      */
     private ObjectId getObjectId(String revstr) throws IOException {
         if (revstr == null) {
@@ -2045,7 +2061,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /*
-     * 주어진 git 객체 참조 값을 이용해서 commit 객체를 가져온다
+     * Find a RevCommit object by revision.
      */
     private RevCommit getRevCommit(String revstr) throws IOException {
         ObjectId objectId = getObjectId(revstr);
@@ -2053,7 +2069,7 @@ public class GitRepository implements PlayRepository {
     }
 
     /*
-     * AnyObjectId 를 이용해서 RevCommit 객체를 얻는다
+     * Find a RevCommit object by id.
      */
     private RevCommit parseCommit(AnyObjectId objectId) throws IOException {
         if (objectId == null) {
