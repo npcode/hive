@@ -89,8 +89,8 @@ public class HttpUtil {
     }
 
     /**
-     * getPreferType()을 이용하여 주어진 Http.Request 가
-     * application/json 을 가장 받기 원하는지(preferred) 여부를 반환한다
+     * Returns whether is the client prefers "application/json" most
+     * using getPreferType()
      *
      * @param request
      * @return
@@ -156,11 +156,11 @@ public class HttpUtil {
     }
 
     /**
-     * 주어진 Http.Request 에서 X-Requested-With 헤더가 존재하며
-     * 그 값이 XMLHttpRequest 인지의 여부를 Boolean 으로 반환한다.
+     * Returns whether request header has "X-Requested-With"
+     * and also its value equals to "XMLHttpRequest".
      *
-     * jQuery, prototype, JindoJS 등 대부분의 JavaScript framework 에서
-     * XHR 호출시 이 헤더에 이 값을 설정하여 전송한다.
+     * Almost of JavaScript framework like as jQuery, prototype, JindoJS,
+     * fills "X-Requested-With" header with "XMLHttpRequest" on sending XHR.
      *
      * @param request
      * @return Boolean
@@ -171,8 +171,7 @@ public class HttpUtil {
     }
 
     /**
-     * 주어진 Http.Request 에서 X-PJAX 헤더가 존재하는지
-     * (= PJAX 요청인지) 여부를 Boolean 으로 반환한다.
+     * Returns whether {@code request} has "X-PJAX" header
      *
      * @param request
      * @return Boolean
